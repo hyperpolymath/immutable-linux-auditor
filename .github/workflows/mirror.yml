@@ -6,53 +6,99 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
-permissions: read-all
+# Minimal permissions - explicitly state contents: read
+permissions:
+  contents: read
+
+# Prevent concurrent mirror operations to avoid race conditions
+concurrency:
+  group: mirror-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   mirror-gitlab:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: vars.GITLAB_MIRROR_ENABLED == 'true'
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure SSH known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -t ed25519,rsa gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
       - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.GITLAB_SSH_KEY }}
+
       - name: Mirror to GitLab
         run: |
-          git remote add gitlab git@gitlab.com:hyperpolymath/${GITHUB_REPOSITORY#*/}.git || true
+          set -euo pipefail
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          git remote add gitlab "git@gitlab.com:hyperpolymath/${REPO_NAME}.git" || git remote set-url gitlab "git@gitlab.com:hyperpolymath/${REPO_NAME}.git"
           git push gitlab --all --force
           git push gitlab --tags --force
 
   mirror-codeberg:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: vars.CODEBERG_MIRROR_ENABLED == 'true'
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure SSH known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -t ed25519,rsa codeberg.org >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
       - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.CODEBERG_SSH_KEY }}
+
       - name: Mirror to Codeberg
         run: |
-          git remote add codeberg git@codeberg.org:hyperpolymath/${GITHUB_REPOSITORY#*/}.git || true
+          set -euo pipefail
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          git remote add codeberg "git@codeberg.org:hyperpolymath/${REPO_NAME}.git" || git remote set-url codeberg "git@codeberg.org:hyperpolymath/${REPO_NAME}.git"
           git push codeberg --all --force
           git push codeberg --tags --force
 
   mirror-bitbucket:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: vars.BITBUCKET_MIRROR_ENABLED == 'true'
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure SSH known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -t ed25519,rsa bitbucket.org >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
       - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.BITBUCKET_SSH_KEY }}
+
       - name: Mirror to Bitbucket
         run: |
-          git remote add bitbucket git@bitbucket.org:hyperpolymath/${GITHUB_REPOSITORY#*/}.git || true
+          set -euo pipefail
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          git remote add bitbucket "git@bitbucket.org:hyperpolymath/${REPO_NAME}.git" || git remote set-url bitbucket "git@bitbucket.org:hyperpolymath/${REPO_NAME}.git"
           git push bitbucket --all --force
           git push bitbucket --tags --force
